@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Proxy Checker 🔥</title>
+  <style>
+    body {
+      background-color: #121212;
+      color: #e0e0e0;
+      font-family: 'Courier New', monospace;
+      padding: 20px;
+    }
+    textarea, input[type="file"], button {
+      margin-top: 10px;
+      display: block;
+    }
+    button {
+      padding: 10px;
+      background: #00acc1;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      margin-right: 5px;
+    }
+    button:hover {
+      background: #00838f;
+    }
+    .green { color: #69f0ae; font-weight: bold; }
+    .red { color: #ff5252; font-weight: bold; }
+    table { width: 100%; margin-top: 20px; border-collapse: collapse; }
+    th, td { padding: 10px; border-bottom: 1px solid #333; }
+    th { background-color: #263238; }
+  </style>
+</head>
+<body>
+  <h2>🔥 Proxy Checker</h2>
+  <textarea id="input" rows="6" placeholder="Masukkan IP:PORT satu per baris..."></textarea>
+  <input type="file" id="fileInput" multiple accept=".txt">
+  <button onclick="loadFromFiles()">Gabungkan dari File</button>
+  <button onclick="startCheck()">Mulai Cek</button>
+
+  <div id="stats">
+    Total: <span id="total">0</span> |
+    Aktif: <span id="active">0</span> |
+    Tidak Aktif: <span id="inactive">0</span> |
+    Error: <span id="error">0</span> |
+    Diperiksa: <span id="checked">0</span>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>No</th><th>IP</th><th>Port</th><th>Status</th><th>Negara</th><th>Org</th><th>Protocol</th><th>Delay</th>
+      </tr>
+    </thead>
+    <tbody id="result"></tbody>
+  </table>
+
+<script>
+async function loadFromFiles() {
+  const files = document.getElementById("fileInput").files;
+  let content = document.getElementById("input").value.trim();
+  for (const file of files) {
+    const text = await file.text();
+    content += "\n" + text.trim();
+  }
+  document.getElementById("input").value = content.trim();
+  alert("File berhasil dimuat.");
+}
+
+async function checkProxy(ip, port, statusCell, countryCell, orgCell, protoCell, delayCell) {
+  try {
+    const res = await fetch("/api", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ip, port }),
+    });
+    const data = await res.json();
+
+    const status = data.proxyip ? "Aktif" : "Tidak Aktif";
+    statusCell.textContent = status;
+    statusCell.className = data.proxyip ? "green" : "red";
+
+    countryCell.textContent = (data.countryCode || "-") + " " + (data.countryFlag || "");
+    orgCell.textContent = data.asOrganization || "-";
+    protoCell.textContent = data.httpProtocol || "-";
+    delayCell.textContent = data.delay || "-";
+
+    return data.proxyip ? "active" : "inactive";
+  } catch {
+    statusCell.textContent = "Error";
+    statusCell.className = "red";
+    return "error";
+  }
+}
+
+async function startCheck() {
+  const input = document.getElementById("input").value.trim();
+  const lines = [...new Set(input.split("\n").map(x => x.trim()).filter(Boolean))];
+  const resultTable = document.getElementById("result");
+  resultTable.innerHTML = "";
+
+  let stats = { total: lines.length, active: 0, inactive: 0, error: 0, checked: 0 };
+  document.getElementById("total").textContent = stats.total;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const [ip, port] = line.split(":");
+    if (!ip || !port) continue;
+
+    const row = resultTable.insertRow();
+    row.insertCell().textContent = i + 1;
+    row.insertCell().textContent = ip;
+    row.insertCell().textContent = port;
+
+    const statusCell = row.insertCell();
+    const countryCell = row.insertCell();
+    const orgCell = row.insertCell();
+    const protoCell = row.insertCell();
+    const delayCell = row.insertCell();
+
+    statusCell.textContent = "...";
+
+    const result = await checkProxy(ip, port, statusCell, countryCell, orgCell, protoCell, delayCell);
+    stats[result]++;
+    stats.checked++;
+
+    document.getElementById("active").textContent = stats.active;
+    document.getElementById("inactive").textContent = stats.inactive;
+    document.getElementById("error").textContent = stats.error;
+    document.getElementById("checked").textContent = stats.checked;
+  }
+}
+</script>
+</body>
+</html>
